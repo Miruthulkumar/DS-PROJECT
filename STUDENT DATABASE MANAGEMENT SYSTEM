@@ -1,0 +1,235 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Structure to hold student information
+typedef struct Student {
+    int rollNumber;
+    char name[50];
+    float cgpa;
+    struct Student *next;
+} Student;
+
+// Structure to hold undo information
+typedef struct Undo {
+    int operation;
+    Student studentData;
+    struct Undo *next;
+} Undo;
+
+// Function prototypes
+void pushUndo(int operation, Student studentData);
+void popUndo();
+void addStudent();
+void deleteStudent();
+void displayStudents();
+void searchStudent();
+void clearBuffer();
+
+// Global variables
+Student *head = NULL;
+Undo *undoStack = NULL;
+
+// Enum to represent operations for undo
+enum Operations {
+    ADD = 1,
+    DELETE,
+    SEARCH
+};
+
+// Function to push undo operation onto the stack
+void pushUndo(int operation, Student studentData) {
+    Undo *newUndo = (Undo *)malloc(sizeof(Undo));
+    if (newUndo == NULL) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    newUndo->operation = operation;
+    newUndo->studentData = studentData;
+    newUndo->next = undoStack;
+    undoStack = newUndo;
+}
+
+// Function to pop the top element from the undo stack and perform the undo operation
+void popUndo() {
+    if (undoStack == NULL) {
+        printf("Undo stack is empty\n");
+        return;
+    }
+    Undo *temp = undoStack;
+    undoStack = undoStack->next;
+
+    if (temp->operation == ADD) {
+        // Undo add: remove the student
+        Student *current = head;
+        Student *prev = NULL;
+        while (current != NULL && current->rollNumber != temp->studentData.rollNumber) {
+            prev = current;
+            current = current->next;
+        }
+        if (current != NULL) {
+            if (prev == NULL) {
+                head = head->next;
+            } else {
+                prev->next = current->next;
+            }
+            free(current);
+        }
+    } else if (temp->operation == DELETE) {
+        // Undo delete: re-add the student
+        Student *newStudent = (Student *)malloc(sizeof(Student));
+        if (newStudent == NULL) {
+            printf("Memory allocation failed\n");
+            exit(1);
+        }
+        *newStudent = temp->studentData;
+        newStudent->next = head;
+        head = newStudent;
+    }
+
+    free(temp);
+    printf("Undo operation performed\n");
+}
+
+// Function to add a new student record
+void addStudent() {
+    Student *newStudent = (Student *)malloc(sizeof(Student));
+    if (newStudent == NULL) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    printf("Enter Roll Number: ");
+    scanf("%d", &newStudent->rollNumber);
+    clearBuffer();
+    printf("Enter Name: ");
+    fgets(newStudent->name, sizeof(newStudent->name), stdin);
+    newStudent->name[strcspn(newStudent->name, "\n")] = '\0'; // Removing trailing newline character
+    printf("Enter CGPA: ");
+    scanf("%f", &newStudent->cgpa);
+    newStudent->next = head;
+    head = newStudent;
+    pushUndo(ADD, *newStudent);
+}
+
+// Function to delete a student record
+void deleteStudent() {
+    if (head == NULL) {
+        printf("Student list is empty\n");
+        return;
+    }
+    int rollNumber;
+    printf("Enter Roll Number to delete: ");
+    scanf("%d", &rollNumber);
+    Student *current = head;
+    Student *prev = NULL;
+    while (current != NULL && current->rollNumber != rollNumber) {
+        prev = current;
+        current = current->next;
+    }
+    if (current == NULL) {
+        printf("Student not found\n");
+        return;
+    }
+    if (prev == NULL)
+        head = head->next;
+    else
+        prev->next = current->next;
+    pushUndo(DELETE, *current);
+    free(current);
+}
+
+// Function to display all student records
+void displayStudents() {
+    if (head == NULL) {
+        printf("Student list is empty\n");
+        return;
+    }
+    Student *current = head;
+    printf("Roll Number\tName\t\tCGPA\n");
+    while (current != NULL) {
+        printf("%d\t\t%s\t\t%.2f\n", current->rollNumber, current->name, current->cgpa);
+        current = current->next;
+    }
+}
+
+// Function to search for a student record
+void searchStudent() {
+    if (head == NULL) {
+        printf("Student list is empty\n");
+        return;
+    }
+    int rollNumber;
+    printf("Enter Roll Number to search: ");
+    scanf("%d", &rollNumber);
+    Student *current = head;
+    while (current != NULL) {
+        if (current->rollNumber == rollNumber) {
+            printf("Student found:\n");
+            printf("Roll Number: %d\n", current->rollNumber);
+            printf("Name: %s\n", current->name);
+            printf("CGPA: %.2f\n", current->cgpa);
+            return;
+        }
+        current = current->next;
+    }
+    printf("Student not found\n");
+}
+
+// Function to clear input buffer
+void clearBuffer() {
+    while (getchar() != '\n');
+}
+
+int main() {
+    int choice;
+
+    do {
+        printf("\nStudent Information Management System\n");
+        printf("1. Add Student\n");
+        printf("2. Delete Student\n");
+        printf("3. Display Students\n");
+        printf("4. Search Student\n");
+        printf("5. Undo\n");
+        printf("6. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        clearBuffer();
+
+        switch (choice) {
+            case 1:
+                addStudent();
+                break;
+            case 2:
+                deleteStudent();
+                break;
+            case 3:
+                displayStudents();
+                break;
+            case 4:
+                searchStudent();
+                break;
+            case 5:
+                popUndo();
+                break;
+            case 6:
+                printf("Exiting program\n");
+                break;
+            default:
+                printf("Invalid choice\n");
+        }
+    } while (choice != 6);
+
+    // Freeing memory
+    while (head != NULL) {
+        Student *temp = head;
+        head = head->next;
+        free(temp);
+    }
+    while (undoStack != NULL) {
+        Undo *temp = undoStack;
+        undoStack = undoStack->next;
+        free(temp);
+    }
+
+    return 0;
+}
